@@ -1,5 +1,7 @@
 package name.ulbricht.iconcreator.gui.main;
 
+import static java.util.Objects.requireNonNull;
+
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
@@ -9,12 +11,11 @@ import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
-import javax.swing.SwingWorker;
-
 import name.ulbricht.iconcreator.core.IconCreator;
 import name.ulbricht.iconcreator.core.IconSize;
 import name.ulbricht.iconcreator.core.ImageCandidate;
 import name.ulbricht.iconcreator.core.ImageFinder;
+import name.ulbricht.iconcreator.gui.util.TaskRunner;
 
 /// View model for [MainView], implementing the JavaBeans property-change
 /// notification pattern. Manages the selected input directory, filename pattern,
@@ -45,7 +46,8 @@ public final class MainViewModel {
     /// {@link Exception} that caused the failure.
     public static final String PROPERTY_ERROR = "error";
 
-    private final PropertyChangeSupport propertyChangeSupport = new PropertyChangeSupport(this);
+    private final TaskRunner taskRunner;
+    private final PropertyChangeSupport propertyChangeSupport;
 
     private boolean busy;
     private Exception error;
@@ -60,7 +62,10 @@ public final class MainViewModel {
 
     /// Creates a new view model with the default filename patterns and one
     /// [ImageItem] per [IconSize].
-    public MainViewModel() {
+    public MainViewModel(final TaskRunner taskRunner) {
+        this.taskRunner = requireNonNull(taskRunner);
+        this.propertyChangeSupport = new PropertyChangeSupport(this);
+
         this.inputPatterns = List.of( //
                 "application_%1$d.png", //
                 "application_%1$dx%1$d.png");
@@ -202,37 +207,23 @@ public final class MainViewModel {
         final var directory = getInputDirectory();
         final var pattern = getInputPattern();
 
-        final var worker = new SwingWorker<Void, ImageCandidate>() {
-
-            @Override
-            protected Void doInBackground() throws Exception {
-                try (var imageFinder = new ImageFinder(directory, pattern)) {
-                    imageFinder.findImages().forEach(this::publish);
-                }
-                return null;
-            }
-
-            @Override
-            protected void process(final List<ImageCandidate> chunks) {
-                chunks.forEach(MainViewModel.this::updateImage);
-            }
-
-            @Override
-            protected void done() {
-                setBusy(false);
-                try {
-                    get();
-                } catch (ExecutionException | InterruptedException ex) {
-                    MainViewModel.this.setError(ex);
-                }
-            }
-        };
-
         setBusy(true);
-
         clearImages();
 
-        worker.execute();
+        this.taskRunner.<Void, ImageCandidate>run(
+                // Perform in background and use the provided publisher for intermediate results
+                publisher -> {
+                    try (var imageFinder = new ImageFinder(directory, pattern)) {
+                        imageFinder.findImages().forEach(publisher);
+                    }
+                    return null;
+                },
+                // Process intermediate results in chunks
+                chunks -> chunks.forEach(MainViewModel.this::updateImage),
+                // Handle successful completion
+                _ -> setBusy(false),
+                // Handle failure
+                this::setError);
     }
 
     private void clearImages() {
@@ -269,29 +260,22 @@ public final class MainViewModel {
         final var file = getOutputFile();
         final var imageFiles = getUsableImageFiles();
 
-        final var worker = new SwingWorker<Void, Void>() {
-
-            @Override
-            protected Void doInBackground() throws Exception {
-                final var iconCreator = new IconCreator(file, imageFiles);
-                iconCreator.create();
-                return null;
-            }
-
-            @Override
-            protected void done() {
-                setBusy(false);
-                try {
-                    get();
-                } catch (ExecutionException | InterruptedException ex) {
-                    MainViewModel.this.setError(ex);
-                }
-            }
-        };
-
         setBusy(true);
 
-        worker.execute();
+        this.taskRunner.<Void, Void>run(
+                // Perform in background (do not use publisher)
+                _ -> {
+                    final var iconCreator = new IconCreator(file, imageFiles);
+                    iconCreator.create();
+                    return null;
+                },
+                // No intermediate results to process
+                _ -> {
+                },
+                // Handle successful completion
+                _ -> setBusy(false),
+                // Handle failure
+                this::setError);
     }
 
     private void updateImage(final ImageCandidate candidate) {

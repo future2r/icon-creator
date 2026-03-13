@@ -20,6 +20,7 @@ import name.ulbricht.iconcreator.Application;
 import name.ulbricht.iconcreator.gui.main.MainView;
 import name.ulbricht.iconcreator.gui.main.MainViewModel;
 import name.ulbricht.iconcreator.gui.util.BusyGlassPane;
+import name.ulbricht.iconcreator.gui.util.TaskRunner;
 
 /// The application's main window.
 public final class MainFrame extends JFrame {
@@ -35,7 +36,7 @@ public final class MainFrame extends JFrame {
         setTitle("Icon Creator");
         setIconImages(loadIcons());
 
-        this.viewModel = new MainViewModel();
+        this.viewModel = new MainViewModel(TaskRunner::async);
         this.view = new MainView(resources, this.viewModel);
 
         setContentPane(view);
