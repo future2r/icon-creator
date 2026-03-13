@@ -1,0 +1,5 @@
+# local VS Code settings
+/.vscode/settings.json
+
+# Maven output
+target/

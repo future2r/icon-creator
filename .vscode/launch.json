@@ -1,0 +1,29 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Icon Creator",
+            "type": "java",
+            "request": "launch",
+            "mainClass": "name.ulbricht.iconcreator/name.ulbricht.iconcreator.Application"
+        },
+        {
+            "name": "Icon Creator (English)",
+            "type": "java",
+            "request": "launch",
+            "mainClass": "name.ulbricht.iconcreator/name.ulbricht.iconcreator.Application",
+            "vmArgs": [
+                "-Duser.language=en"
+            ]
+        },
+        {
+            "name": "Icon Creator (German)",
+            "type": "java",
+            "request": "launch",
+            "mainClass": "name.ulbricht.iconcreator/name.ulbricht.iconcreator.Application",
+            "vmArgs": [
+                "-Duser.language=de"
+            ]
+        }
+    ]
+}
